@@ -67,6 +67,7 @@ static const QDevAlias qdev_alias_table[] = {
             QEMU_ARCH_ALL & ~QEMU_ARCH_S390X },
     { "virtio-blk-ccw", "virtio-blk", QEMU_ARCH_S390X },
     { "virtio-blk-pci", "virtio-blk", QEMU_ARCH_ALL & ~QEMU_ARCH_S390X },
+    { "virtio-gl-pci", "virtio-gl", QEMU_ARCH_ALL & ~QEMU_ARCH_S390X },
     { "virtio-gpu-ccw", "virtio-gpu", QEMU_ARCH_S390X },
     { "virtio-gpu-pci", "virtio-gpu", QEMU_ARCH_ALL & ~QEMU_ARCH_S390X },
     { "virtio-input-host-ccw", "virtio-input-host", QEMU_ARCH_S390X },
