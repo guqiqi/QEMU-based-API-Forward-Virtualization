@@ -243,3 +243,8 @@ pca955x_gpio_change(const char *description, unsigned id, unsigned prev_state, u
 bcm2835_cprman_read(uint64_t offset, uint64_t value) "offset:0x%" PRIx64 " value:0x%" PRIx64
 bcm2835_cprman_write(uint64_t offset, uint64_t value) "offset:0x%" PRIx64 " value:0x%" PRIx64
 bcm2835_cprman_write_invalid_magic(uint64_t offset, uint64_t value) "offset:0x%" PRIx64 " value:0x%" PRIx64
+
+# virtio_gl.C
+virtio_gl_device_class_init(uint64_t addr) "VITRIO_GL device addr:0x%03"PRIx64" "
+virtio_gl_pci_class_init(uint64_t addr) "VITRIO_GL pci addr:0x%03"PRIx64" "
+virtio_gl_dev_realize(uint64_t addr) "VITRIO_GL dev addr:0x%03"PRIx64" "

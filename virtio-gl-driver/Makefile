@@ -13,7 +13,9 @@ endif
 
 i insmod:
 	sudo dmesg -C
-	sudo rmmod $(MOD)
+	@if [ -n "`lsmod | grep $(MOD)`" ]; then \
+	sudo rmmod $(MOD); \
+	fi
 	sudo insmod ${MOD}.ko
 # -sudo chmod 666 /dev/gl
 
@@ -28,7 +30,7 @@ s show_dmesg:
 	-@dmesg
 	@echo "============================================================="
 
-clean:
+c clean:
 	rm -rf *.o *.ko *.mod.c *.order *.symvers .*.cmd .tmp_versions
 .PHONY:clean
 

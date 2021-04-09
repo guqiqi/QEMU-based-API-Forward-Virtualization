@@ -34,6 +34,8 @@
 #include "qapi/visitor.h"
 #include "hw/virtio/virtio-pci.h"
 
+#include "trace.h"
+
 #include "../../../virtio-gl-driver/virtio_gl_common.h"
 
 //////////////////////////////////////////////////////////////////////////////
@@ -45,7 +47,7 @@ typedef struct VirtIOGLConf VirtIOGLConf;
 
 struct VirtIOGLConf
 {
-	uint64_t mem_size;
+    uint64_t mem_size;
 };
 
 struct VirtIOGL
@@ -55,11 +57,42 @@ struct VirtIOGL
     VirtIOGLConf conf;
 };
 
+static int vgl_cmd_write(VirtioGLArg *arg)
+{
+    printf("write");
+    return 0;
+}
+
+static int vgl_create_window(VirtioGLArg *arg)
+{
+    printf("create window");
+    return 0;
+}
+
 //####################################################################
 //   class basic callback functions
 //####################################################################
 static void virtio_gl_cmd_handle(VirtIODevice *vdev, VirtQueue *vq)
 {
+    VirtQueueElement elem;
+    VirtioGLArg *arg;
+
+    arg = malloc(sizeof(VirtioGLArg));
+    while (virtqueue_pop(vq, &elem))
+    {
+        switch (arg->cmd)
+        {
+        case VIRTGL_CMD_WRITE:
+            vgl_cmd_write(arg);
+            break;
+        case VIRTGL_OPENGL_CREATE_WINDOW:
+            vgl_create_window(arg);
+            break;
+        default:
+            break;
+        }
+    }
+    free(arg);
 }
 
 static uint64_t virtio_gl_get_features(VirtIODevice *vdev, uint64_t features, Error **errp)
@@ -93,6 +126,8 @@ static void virtio_gl_class_init(ObjectClass *klass, void *data)
     DeviceClass *dc = DEVICE_CLASS(klass);
     VirtioDeviceClass *vdc = VIRTIO_DEVICE_CLASS(klass);
 
+    trace_virtio_gl_device_class_init(dc);
+
     device_class_set_props(vdc, virtio_gl_properties);
 
     set_bit(DEVICE_CATEGORY_MISC, dc->categories);
@@ -116,7 +151,7 @@ static const TypeInfo virtio_gl_device_info = {
 //////////////////////////////////////////////////////////////////////////////
 
 static void virtio_gl_device_register_types(void)
-{    
+{
     type_register_static(&virtio_gl_device_info);
 }
 type_init(virtio_gl_device_register_types)
@@ -124,25 +159,27 @@ type_init(virtio_gl_device_register_types)
 //////////////////////////////////////////////////////////////////////////////
 // begin of VIRTIO GL PCI info
 #define TYPE_VIRTIO_GL_PCI "virtio-gl-pci"
-#define VIRTIO_GL_PCI(obj) OBJECT_CHECK(VirtIOGLPCI, (obj), TYPE_VIRTIO_GL_PCI)     
-typedef struct VirtIOGLPCI VirtIOGLPCI;
+#define VIRTIO_GL_PCI(obj) OBJECT_CHECK(VirtIOGLPCI, (obj), TYPE_VIRTIO_GL_PCI)
+    typedef struct VirtIOGLPCI VirtIOGLPCI;
 
-struct VirtIOGLPCI {
+struct VirtIOGLPCI
+{
     VirtIOPCIProxy parent_obj;
     VirtIOGL vdev;
 };
 
 static void virtio_gl_pci_realize(VirtIOPCIProxy *vpci_dev, Error **errp)
 {
-    VirtIOGLPCI *gl= VIRTIO_GL_PCI(vpci_dev);
+    VirtIOGLPCI *gl = VIRTIO_GL_PCI(vpci_dev);
     DeviceState *vdev = DEVICE(&gl->vdev);
 
     virtio_pci_force_virtio_1(vpci_dev);
-    if (!qdev_realize(vdev, BUS(&vpci_dev->bus), errp)) {
+    trace_virtio_gl_dev_realize(vdev);
+    if (!qdev_realize(vdev, BUS(&vpci_dev->bus), errp))
+    {
+        trace_virtio_gl_dev_realize(vdev);
         return;
     }
-    // qdev_set_parent_bus(vdev, BUS(&vpci_dev->bus), errp);
-    // object_property_set_bool(OBJECT(vdev), true, "realized", errp);
 }
 
 static Property virtio_gl_pci_properties[] = {
@@ -158,14 +195,16 @@ static void virtio_gl_pci_class_init(ObjectClass *klass, void *data)
     PCIDeviceClass *pcidev_k = PCI_DEVICE_CLASS(klass);
     VirtioPCIClass *k = VIRTIO_PCI_CLASS(klass);
 
+    trace_virtio_gl_pci_class_init(dc);
+
     set_bit(DEVICE_CATEGORY_MISC, dc->categories);
     device_class_set_props(dc, virtio_gl_pci_properties);
 
     k->realize = virtio_gl_pci_realize;
     pcidev_k->vendor_id = PCI_VENDOR_ID_REDHAT_QUMRANET;
     pcidev_k->device_id = PCI_DEVICE_ID_VIRTIO_GL;
-	pcidev_k->revision = VIRTIO_PCI_ABI_VERSION;
-   	pcidev_k->class_id  = PCI_CLASS_OTHERS;
+    pcidev_k->revision = VIRTIO_PCI_ABI_VERSION;
+    pcidev_k->class_id = PCI_CLASS_OTHERS;
 }
 
 static void virtio_gl_pci_instance_init(Object *obj)
@@ -177,20 +216,18 @@ static void virtio_gl_pci_instance_init(Object *obj)
 }
 
 static const VirtioPCIDeviceTypeInfo virtio_gl_pci_info = {
-    .base_name     = "virtio-gl-pci-base",
-    .parent        = TYPE_VIRTIO_PCI,
-    .generic_name  = TYPE_VIRTIO_GL_PCI,
+    .base_name = "virtio-gl-pci-base",
+    .parent = TYPE_VIRTIO_PCI,
+    .name = TYPE_VIRTIO_GL_PCI,
     .instance_size = sizeof(VirtIOGLPCI),
     .instance_init = virtio_gl_pci_instance_init,
-    .class_init    = virtio_gl_pci_class_init,
+    .class_init = virtio_gl_pci_class_init,
 };
 // end of VIRTIO GL PCI info
 //////////////////////////////////////////////////////////////////////////////
 
-
 static void virtio_gl_pci_register_types(void)
-{    
-    // type_register_static(&virtio_gl_pci_base_info);
+{
     virtio_pci_types_register(&virtio_gl_pci_info);
 }
 type_init(virtio_gl_pci_register_types)
