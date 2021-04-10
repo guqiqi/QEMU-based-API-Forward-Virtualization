@@ -14,6 +14,10 @@
 
 #define dev_path "/dev/virtio-gl"
 
+#define ptr(p, v, s) \
+	p = (uint64_t)v; \
+	p##Size = (uint32_t)s;
+
 int fd = -1;
 
 void open_device()
@@ -37,5 +41,8 @@ void send_cmd_to_device(int cmd, VirtioGLArg *arg)
 int main(){
     open_device();
     
+	VirtioGLArg arg;
+	// ptr(arg.pA, ptr, 0);
+	send_cmd_to_device(VIRTGL_OPENGL_CREATE_WINDOW, NULL);
 
 }
