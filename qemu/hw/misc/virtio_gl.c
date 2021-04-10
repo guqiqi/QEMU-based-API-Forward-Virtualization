@@ -218,7 +218,7 @@ static void virtio_gl_pci_instance_init(Object *obj)
 static const VirtioPCIDeviceTypeInfo virtio_gl_pci_info = {
     .base_name = "virtio-gl-pci-base",
     .parent = TYPE_VIRTIO_PCI,
-    .name = TYPE_VIRTIO_GL_PCI,
+    .generic_name = TYPE_VIRTIO_GL_PCI,
     .instance_size = sizeof(VirtIOGLPCI),
     .instance_init = virtio_gl_pci_instance_init,
     .class_init = virtio_gl_pci_class_init,

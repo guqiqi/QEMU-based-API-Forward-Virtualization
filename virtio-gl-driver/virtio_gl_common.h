@@ -1,4 +1,4 @@
-#define VIRTIO_ID_GL 69
+#define VIRTIO_ID_GL 49
 
 
 enum
