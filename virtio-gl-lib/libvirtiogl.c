@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 #include <errno.h>
 
 #include <fcntl.h> // open
@@ -9,7 +10,9 @@
 
 #include "../virtio-gl-driver/virtio_gl_common.h"
 
-#define dev_path "/dev/gl"
+#define error(fmt, arg...) printf("ERROR: "fmt, ##arg)
+
+#define dev_path "/dev/virtio-gl"
 
 int fd = -1;
 
@@ -21,7 +24,6 @@ void open_device()
 		error("open device %s faild, %s (%d)\n", dev_path, strerror(errno), errno);
 		exit (EXIT_FAILURE);
 	}
-	//printf("open is ok fd: %d\n", fd);
 }
 
 void send_cmd_to_device(int cmd, VirtioGLArg *arg)
