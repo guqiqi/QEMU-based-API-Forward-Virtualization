@@ -122,6 +122,7 @@ static int virtio_gl_misc_send_cmd(VirtioGLArg *req)
 	res = kmalloc_safe(sizeof(VirtioGLArg));
 	memcpy(res, req, sizeof(VirtioGLArg)); // dest, src, size
 
+ptrace("req: %d", sizeof(VirtioGLArg));
 	sg_init_one(&req_sg, req, sizeof(VirtioGLArg));
 	sg_init_one(&res_sg, res, sizeof(VirtioGLArg));
 
@@ -129,6 +130,11 @@ static int virtio_gl_misc_send_cmd(VirtioGLArg *req)
 	sgs[1] = &res_sg;
 
 	err =  virtqueue_add_sgs(vgl->vq, sgs, 1, 1, req, GFP_ATOMIC);
+
+ptrace("req: %u, %u, %u, %u, %u", req->cmd, req->pA, req->pASize, req->pB, req->pBSize);
+
+virtqueue_kick(vgl->vq);
+
 
 	return err;
 }
@@ -138,7 +144,9 @@ static int virtio_gl_misc_send_cmd(VirtioGLArg *req)
 // ##################################################################################
 
 static long virtio_gl_misc_ioctl(struct file *filp, unsigned int _cmd, unsigned long _arg){
-    VirtioGLArg *arg;
+ptrace("send message!\n");    
+ptrace("cmd: %d!\n", _cmd);
+VirtioGLArg *arg;
     int err;
 
     arg = kmalloc_safe(sizeof(VirtioGLArg));
@@ -149,6 +157,7 @@ static long virtio_gl_misc_ioctl(struct file *filp, unsigned int _cmd, unsigned 
     err = (int)virtio_gl_misc_send_cmd(arg);
 
     kfree(arg);
+ptrace("%d\n", err); 
 
     return err;
 }
@@ -190,7 +199,7 @@ static struct miscdevice gl_misc_driver = {
  * callback function
  * */
 static void vgl_virtio_cmd_vq_cb(struct virtqueue *vq){
-
+ ptrace("callback!\n");
 }
 
 static struct virtio_device_id id_table[] = {
@@ -202,7 +211,6 @@ static unsigned int features[] = {};
 
 static int gl_virtio_probe(struct virtio_device *dev){
     ptrace("probe module!\n");
-	// printk(KERN_ALERT "probe module!\n");
 
     int err;
 
@@ -233,14 +241,15 @@ static void gl_virtio_remove(struct virtio_device *dev){
     // int err;
 
     misc_deregister(&gl_misc_driver);
+printk(KERN_ALERT "remove misc!\n");
 	// if( err ){
 	// 	error("misc_deregister failed\n");
 	// }
 
 	vgl->vdev->config->reset(vgl->vdev);
 	vgl->vdev->config->del_vqs(vgl->vdev);
-	kfree(vgl->vq);
-	kfree(vgl);
+	//kfree(vgl->vq);
+	//kfree(vgl);
 }
 
 static struct virtio_driver virtio_gl_driver = {
@@ -269,14 +278,16 @@ static int __init init(void)
 static void __exit mod_exit(void)
 {
 	ptrace("bye module!\n");
+//ptrace("%d\n", &virtio_gl_driver);
+//ptrace("%d\n", virtio_gl_driver);
 	unregister_virtio_driver(&virtio_gl_driver);
 }
 
 module_init(init);
-module_exit(mod_exit);
+ module_exit(mod_exit);
 
 // replace module_init and module_exit function
-// module_virtio_driver(virtio_gl_driver);
+//module_virtio_driver(virtio_gl_driver);
 
 MODULE_DEVICE_TABLE(virtio, id_table);
 MODULE_DESCRIPTION("Qemu Virtio GL driver");
