@@ -103,6 +103,20 @@ static inline void* kmalloc_safe(size_t size)
 	return ret;
 }
 
+static uint64_t user_to_gpa(uint64_t from, uint32_t size){
+	void *gva;
+	gva = kmalloc_safe(size);
+	
+	if(from)
+		copy_from_user_safe(gva, (const void*)from, size);
+
+	return (uint64_t)virt_to_phys(gva);
+}
+
+static void kfree_gpa(uint64_t pa, uint32_t size){
+	kfree(phys_to_virt((phys_addr_t)pa));
+}
+
 
 // ##################################################################################
 // OpenGL Operations
@@ -122,7 +136,6 @@ static int virtio_gl_misc_send_cmd(VirtioGLArg *req)
 	res = kmalloc_safe(sizeof(VirtioGLArg));
 	memcpy(res, req, sizeof(VirtioGLArg)); // dest, src, size
 
-ptrace("req: %d", sizeof(VirtioGLArg));
 	sg_init_one(&req_sg, req, sizeof(VirtioGLArg));
 	sg_init_one(&res_sg, res, sizeof(VirtioGLArg));
 
@@ -131,12 +144,33 @@ ptrace("req: %d", sizeof(VirtioGLArg));
 
 	err =  virtqueue_add_sgs(vgl->vq, sgs, 1, 1, req, GFP_ATOMIC);
 
-ptrace("req: %u, %u, %u, %u, %u", req->cmd, req->pA, req->pASize, req->pB, req->pBSize);
+ptrace("cmd req: %u, %lu, %u, %lu, %u", req->cmd, req->pA, req->pASize, req->pB, req->pBSize);
 
 virtqueue_kick(vgl->vq);
 
 
 	return err;
+}
+
+static int virtio_gl_misc_send_cmd_no_arg(VirtioGLArg *arg){
+	return (int)virtio_gl_misc_send_cmd(arg);
+}
+
+static int virtio_gl_misc_send_cmd_two_args(VirtioGLArg *arg){
+	int *a = arg->pA;
+	char *b = arg->pB;
+	ptrace("a: %d! %u\n", *a, arg->pASize);
+	ptrace("b: %s! %u\n", b, arg->pBSize);
+ptrace("logical arg: %u, %lu, %u, %lu, %u", arg->cmd, arg->pA, arg->pASize, arg->pB, arg->pBSize);
+	arg->pA = user_to_gpa(arg->pA, arg->pASize);
+	arg->pB = user_to_gpa(arg->pB, arg->pBSize);
+
+	ptrace("pysical arg: %u, %lu, %u, %lu, %u", arg->cmd, arg->pA, arg->pASize, arg->pB, arg->pBSize);
+	
+	//kfree_gpa(arg->pA, arg->pASize);
+	//kfree_gpa(arg->pB, arg->pBSize);
+
+	return (int)virtio_gl_misc_send_cmd(arg);
 }
 
 // ##################################################################################
@@ -146,7 +180,7 @@ virtqueue_kick(vgl->vq);
 static long virtio_gl_misc_ioctl(struct file *filp, unsigned int _cmd, unsigned long _arg){
 ptrace("send message!\n");    
 ptrace("cmd: %d!\n", _cmd);
-VirtioGLArg *arg;
+    VirtioGLArg *arg;
     int err;
 
     arg = kmalloc_safe(sizeof(VirtioGLArg));
@@ -154,10 +188,21 @@ VirtioGLArg *arg;
 
     arg->cmd = _cmd;
 
-    err = (int)virtio_gl_misc_send_cmd(arg);
+    switch(arg->cmd){
+	case VIRTGL_CMD_WRITE:
+	    err = (int)virtio_gl_misc_send_cmd_two_args(arg);
+	    break;
+	case VIRTGL_OPENGL_CREATE_WINDOW:
+	    err = (int)virtio_gl_misc_send_cmd_no_arg(arg);
+	    break;
+	default:
+	    ptrace("unknown cmd!\n");
+	    break;
+    }
 
-    kfree(arg);
-ptrace("%d\n", err); 
+    
+
+    //kfree(arg);
 
     return err;
 }
@@ -278,8 +323,6 @@ static int __init init(void)
 static void __exit mod_exit(void)
 {
 	ptrace("bye module!\n");
-//ptrace("%d\n", &virtio_gl_driver);
-//ptrace("%d\n", virtio_gl_driver);
 	unregister_virtio_driver(&virtio_gl_driver);
 }
 
