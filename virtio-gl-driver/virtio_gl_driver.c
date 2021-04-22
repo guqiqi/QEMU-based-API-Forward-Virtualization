@@ -120,27 +120,6 @@ static void kfree_gpa(uint64_t pa, uint32_t size){
 	kfree(phys_to_virt((phys_addr_t)pa));
 }
 
-void static read_from_physic(void *gpa){
-	   int fd;
-       int *rdbuf;
-      
-       fd = open("/dev/mem",O_RDWR);
-       if(fd < 0)
-       {
-         ptrace("open /dev/mem failed.");
-       }
-       
-       int offset = lseek(fd,gpa,SEEK_SET);
-	   if(offset < 0)
-	   		ptrace("lseek failed.");
-       
-       read(fd,rdbuf,4);
-       
-    ptrace("nvalue [%d]:%c\n",*rdbuf);
-       
-       return 0;
-}
-
 // ##################################################################################
 // OpenGL Operations
 // ##################################################################################
@@ -181,16 +160,11 @@ static int virtio_gl_misc_send_cmd_no_arg(VirtioGLArg *arg){
 static int virtio_gl_misc_send_cmd_two_args(VirtioGLArg *arg){
 	int *a = arg->pA;
 	char *b = arg->pB;
-	ptrace("a: %d! %u\n", *a, arg->pASize);
-	ptrace("b: %s! %u\n", b, arg->pBSize);
-	ptrace("logical arg: %u, %lu, %u, %lu, %u", arg->cmd, arg->pA, arg->pASize, arg->pB, arg->pBSize);
+	
 	arg->pA = user_to_gpa(arg->pA, arg->pASize);
 	arg->pB = user_to_gpa(arg->pB, arg->pBSize);
 
 	ptrace("pysical arg: %u, %lu, %u, %lu, %u", arg->cmd, arg->pA, arg->pASize, arg->pB, arg->pBSize);
-	
-	//kfree_gpa(arg->pA, arg->pASize);
-	//kfree_gpa(arg->pB, arg->pBSize);
 
 	return (int)virtio_gl_misc_send_cmd(arg);
 }
@@ -199,8 +173,7 @@ static int virtio_gl_misc_send_cmd_two_args(VirtioGLArg *arg){
 // Machine Driver
 // ##################################################################################
 
-static long virtio_gl_misc_ioctl(struct file *filp, unsigned int _cmd, unsigned long _arg){
-	ptrace("send message!\n");    
+static long virtio_gl_misc_ioctl(struct file *filp, unsigned int _cmd, unsigned long _arg){ 
 	ptrace("cmd: %d!\n", _cmd);
     VirtioGLArg *arg;
     int err;
@@ -275,8 +248,6 @@ static struct virtio_device_id id_table[] = {
 static unsigned int features[] = {};
 
 static int gl_virtio_probe(struct virtio_device *dev){
-    ptrace("probe module!\n");
-
     int err;
 
     vgl = kzalloc_safe(sizeof(struct virtio_gl));
@@ -331,7 +302,6 @@ static int __init init(void)
 	int ret;
 
 	ret = register_virtio_driver(&virtio_gl_driver);
-	ptrace("register virtio gl driver ret: %d\n", ret);
 	if( ret < 0 ){
 		error("register virtio driver faild (%d)\n", ret);
 	}
@@ -346,7 +316,7 @@ static void __exit mod_exit(void)
 }
 
 module_init(init);
- module_exit(mod_exit);
+module_exit(mod_exit);
 
 // replace module_init and module_exit function
 //module_virtio_driver(virtio_gl_driver);

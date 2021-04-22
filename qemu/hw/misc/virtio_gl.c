@@ -38,6 +38,33 @@
 
 #include "../../../virtio-gl-driver/virtio_gl_common.h"
 
+#include <fcntl.h>
+
+#include <stdio.h>
+
+#if 1
+#define printf(fmt, arg...) {\
+    FILE *fptr = fopen("log.txt", "a+");\
+	fprintf(fptr, fmt, ##arg);\
+    fclose(fptr);\
+}
+#else
+
+#endif
+
+static void* gpa_to_hva(uint64_t pa) 
+{
+	MemoryRegionSection section;
+
+	section = memory_region_find(get_system_memory(), (ram_addr_t)pa, 1);
+	if ( !int128_nz(section.size) || !memory_region_is_ram(section.mr)){
+		error("addr %p in rom\n", (void*)pa); 
+		return 0;
+	}
+
+	return (memory_region_get_ram_ptr(section.mr) + section.offset_within_region);
+}
+
 //////////////////////////////////////////////////////////////////////////////
 // begin of VIRTIO GL DEVICE info
 #define TYPE_VIRTIO_GL "virtio-gl-device"
@@ -59,13 +86,35 @@ struct VirtIOGL
 
 static int vgl_cmd_write(VirtioGLArg *arg)
 {
-    printf("write");
+    printf("pA = %d , pASize = %u, pB = %d , pBSize = %u\n", arg->pA, arg->pASize, arg->pB, arg->pBSize);
+
+    int *intPointer;
+	char *charPointer;
+
+    intPointer  = gpa_to_hva(arg->pA);
+	charPointer = gpa_to_hva(arg->pB);
+
+    printf("A address= %llu ,B address= '%llu'\n", intPointer, charPointer);
+
+    uint32_t sizeA, sizeB;
+    sizeA = arg->pASize;
+    sizeB = arg->pBSize;
+
+    int *testInt;
+    char *testChar;
+    testInt = (int*)malloc(4);
+    testChar = (char*)malloc(sizeB);
+
+	memcpy(testInt, intPointer, 4);
+    memcpy(testChar, charPointer, sizeB);
+	
+    printf("int= %d ,char= '%s'\n", *testInt, testChar);
     return 0;
 }
 
 static int vgl_create_window(VirtioGLArg *arg)
 {
-    printf("create window");
+    printf("create window \n");
     return 0;
 }
 
@@ -74,12 +123,27 @@ static int vgl_create_window(VirtioGLArg *arg)
 //####################################################################
 static void virtio_gl_cmd_handle(VirtIODevice *vdev, VirtQueue *vq)
 {
-    VirtQueueElement elem;
+    VirtQueueElement *elem;
     VirtioGLArg *arg;
+    size_t s;
 
     arg = malloc(sizeof(VirtioGLArg));
-    while (virtqueue_pop(vq, &elem))
-    {
+    elem = virtqueue_pop(vq, sizeof(VirtQueueElement));
+    // if(elem){
+    //     s = iov_to_buf(elem->in_sg, elem->in_num, 0,
+    //                    arg, sizeof(VirtioGLArg));
+    //     printf("arg get size: %d \n", s);
+    //     printf("-----cmd: %d \n", arg->cmd);
+    // }
+    // else{
+    //     printf("no arg\n");
+    // }
+    while(elem){
+        s = iov_to_buf(elem->in_sg, elem->in_num, 0,
+                       arg, sizeof(VirtioGLArg));
+        printf("arg get size: %d \n", s);
+        printf("-----cmd: %d \n", arg->cmd);
+
         switch (arg->cmd)
         {
         case VIRTGL_CMD_WRITE:
@@ -91,8 +155,26 @@ static void virtio_gl_cmd_handle(VirtIODevice *vdev, VirtQueue *vq)
         default:
             break;
         }
+        
+        elem = virtqueue_pop(vq, sizeof(VirtQueueElement));
     }
-    free(arg);
+    // while (virtqueue_pop(vq, &elem))
+    // {
+    //     printf("get from virtio queue\n");
+    //     printf("cmd: %d \n", arg->cmd);
+    //     switch (arg->cmd)
+    //     {
+    //     case VIRTGL_CMD_WRITE:
+    //         vgl_cmd_write(arg);
+    //         break;
+    //     case VIRTGL_OPENGL_CREATE_WINDOW:
+    //         vgl_create_window(arg);
+    //         break;
+    //     default:
+    //         break;
+    //     }
+    // }
+    // free(arg);
 }
 
 static uint64_t virtio_gl_get_features(VirtIODevice *vdev, uint64_t features, Error **errp)
