@@ -15,6 +15,8 @@
 #include <linux/io.h>
 #include <linux/sort.h>
 
+#include <fcntl.h>
+
 #include "virtio_gl_common.h"
 
 #define error(fmt, arg...) \
@@ -110,6 +112,7 @@ static uint64_t user_to_gpa(uint64_t from, uint32_t size){
 	if(from)
 		copy_from_user_safe(gva, (const void*)from, size);
 
+	ptrace("value in vga: %d", vga);
 	return (uint64_t)virt_to_phys(gva);
 }
 
@@ -117,6 +120,26 @@ static void kfree_gpa(uint64_t pa, uint32_t size){
 	kfree(phys_to_virt((phys_addr_t)pa));
 }
 
+void static read_from_physic(void *gpa){
+	   int fd;
+       int *rdbuf;
+      
+       fd = open("/dev/mem",O_RDWR);
+       if(fd < 0)
+       {
+         ptrace("open /dev/mem failed.");
+       }
+       
+       int offset = lseek(fd,gpa,SEEK_SET);
+	   if(offset < 0)
+	   		ptrace("lseek failed.");
+       
+       read(fd,rdbuf,4);
+       
+    ptrace("nvalue [%d]:%c\n",*rdbuf);
+       
+       return 0;
+}
 
 // ##################################################################################
 // OpenGL Operations
@@ -144,10 +167,9 @@ static int virtio_gl_misc_send_cmd(VirtioGLArg *req)
 
 	err =  virtqueue_add_sgs(vgl->vq, sgs, 1, 1, req, GFP_ATOMIC);
 
-ptrace("cmd req: %u, %lu, %u, %lu, %u", req->cmd, req->pA, req->pASize, req->pB, req->pBSize);
+	ptrace("cmd req: %u, %lu, %u, %lu, %u", req->cmd, req->pA, req->pASize, req->pB, req->pBSize);
 
-virtqueue_kick(vgl->vq);
-
+	virtqueue_kick(vgl->vq);
 
 	return err;
 }
@@ -161,7 +183,7 @@ static int virtio_gl_misc_send_cmd_two_args(VirtioGLArg *arg){
 	char *b = arg->pB;
 	ptrace("a: %d! %u\n", *a, arg->pASize);
 	ptrace("b: %s! %u\n", b, arg->pBSize);
-ptrace("logical arg: %u, %lu, %u, %lu, %u", arg->cmd, arg->pA, arg->pASize, arg->pB, arg->pBSize);
+	ptrace("logical arg: %u, %lu, %u, %lu, %u", arg->cmd, arg->pA, arg->pASize, arg->pB, arg->pBSize);
 	arg->pA = user_to_gpa(arg->pA, arg->pASize);
 	arg->pB = user_to_gpa(arg->pB, arg->pBSize);
 
@@ -178,8 +200,8 @@ ptrace("logical arg: %u, %lu, %u, %lu, %u", arg->cmd, arg->pA, arg->pASize, arg-
 // ##################################################################################
 
 static long virtio_gl_misc_ioctl(struct file *filp, unsigned int _cmd, unsigned long _arg){
-ptrace("send message!\n");    
-ptrace("cmd: %d!\n", _cmd);
+	ptrace("send message!\n");    
+	ptrace("cmd: %d!\n", _cmd);
     VirtioGLArg *arg;
     int err;
 
@@ -189,18 +211,16 @@ ptrace("cmd: %d!\n", _cmd);
     arg->cmd = _cmd;
 
     switch(arg->cmd){
-	case VIRTGL_CMD_WRITE:
-	    err = (int)virtio_gl_misc_send_cmd_two_args(arg);
-	    break;
-	case VIRTGL_OPENGL_CREATE_WINDOW:
-	    err = (int)virtio_gl_misc_send_cmd_no_arg(arg);
-	    break;
-	default:
-	    ptrace("unknown cmd!\n");
-	    break;
+		case VIRTGL_CMD_WRITE:
+			err = (int)virtio_gl_misc_send_cmd_two_args(arg);
+			break;
+		case VIRTGL_OPENGL_CREATE_WINDOW:
+			err = (int)virtio_gl_misc_send_cmd_no_arg(arg);
+			break;
+		default:
+			ptrace("unknown cmd!\n");
+			break;
     }
-
-    
 
     //kfree(arg);
 
@@ -244,7 +264,7 @@ static struct miscdevice gl_misc_driver = {
  * callback function
  * */
 static void vgl_virtio_cmd_vq_cb(struct virtqueue *vq){
- ptrace("callback!\n");
+ 	ptrace("callback!\n");
 }
 
 static struct virtio_device_id id_table[] = {
@@ -271,8 +291,7 @@ static int gl_virtio_probe(struct virtio_device *dev){
     vgl->vq = virtio_find_single_vq(dev, vgl_virtio_cmd_vq_cb, 
 			"request_handle");
     // TODO err handler
-
-    err = misc_register(&gl_misc_driver);
+	err = misc_register(&gl_misc_driver);
 	if (err)
 	{
 		error("virthm: register misc device failed.\n");
@@ -286,7 +305,7 @@ static void gl_virtio_remove(struct virtio_device *dev){
     // int err;
 
     misc_deregister(&gl_misc_driver);
-printk(KERN_ALERT "remove misc!\n");
+	printk(KERN_ALERT "remove misc!\n");
 	// if( err ){
 	// 	error("misc_deregister failed\n");
 	// }
